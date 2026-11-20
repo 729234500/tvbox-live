@@ -1,0 +1,40 @@
+{
+  "urls": [
+    {
+      "url": "https://raw.githubusercontent.com/qist/tvbox/master/0821.json",
+      "name": "饭太硬 0821（86站点）"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/qist/tvbox/master/0826.json",
+      "name": "极简 0826（54站点）"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/qist/tvbox/master/jsm.json",
+      "name": "jsm 大合集（163站点）"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/gaotianliuyun/gao/master/0827.json",
+      "name": "FongMi 0827（33站点）"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/yw88075/tvbox/main/yw.json",
+      "name": "心魔在线（151站点）"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/noimank/tvbox/main/tvboxmuti.json",
+      "name": "noimank 多仓（14仓）"
+    },
+    {
+      "url": "https://6800.kstore.vip/fish.json",
+      "name": "无名 fish（111站点）"
+    },
+    {
+      "url": "http://ztha.top/TVBox/GYCK.json",
+      "name": "挺好分享 多仓（32仓）"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/qist/tvbox/master/0825.json",
+      "name": "tvbox/0825.json（135站点）"
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "_comment": "候选源清单。prefer 越大排越前；type 可省略（自动判断单仓/多仓）。改完直接 commit，Actions 会立刻重跑一次。",
+  "mirror": "https://gh-proxy.com/",
+  "mirror_backup": "https://ghfast.top/",
+  "max_sources": 10,
+  "max_per_host": 4,
+  "sources": [
+    {
+      "name": "饭太硬 0821",
+      "url": "https://raw.githubusercontent.com/qist/tvbox/master/0821.json",
+      "prefer": 100
+    },
+    {
+      "name": "极简 0826",
+      "url": "https://raw.githubusercontent.com/qist/tvbox/master/0826.json",
+      "prefer": 90
+    },
+    {
+      "name": "jsm 大合集",
+      "url": "https://raw.githubusercontent.com/qist/tvbox/master/jsm.json",
+      "prefer": 85
+    },
+    {
+      "name": "FongMi 0827",
+      "url": "https://raw.githubusercontent.com/gaotianliuyun/gao/master/0827.json",
+      "prefer": 80
+    },
+    {
+      "name": "心魔在线",
+      "url": "https://raw.githubusercontent.com/yw88075/tvbox/main/yw.json",
+      "prefer": 70
+    },
+    {
+      "name": "noimank 多仓",
+      "url": "https://raw.githubusercontent.com/noimank/tvbox/main/tvboxmuti.json",
+      "prefer": 60
+    },
+    {
+      "name": "无名 fish",
+      "url": "https://6800.kstore.vip/fish.json",
+      "prefer": 50
+    },
+    {
+      "name": "摸鱼儿",
+      "url": "http://www.y456y.com",
+      "prefer": 40
+    },
+    {
+      "name": "挺好分享 多仓",
+      "url": "http://ztha.top/TVBox/GYCK.json",
+      "prefer": 30
+    }
+  ],
+  "discover": {
+    "_comment": "自动发现新源：列仓库根目录的 json 文件 + 从 README 里抓 raw 链接",
+    "repos": [
+      "qist/tvbox",
+      "gaotianliuyun/gao",
+      "yw88075/tvbox"
+    ],
+    "readmes": [
+      "laoma528/awesome-zhuiju-free"
+    ],
+    "max_new": 6
+  },
+  "live": [
+    {
+      "name": "fanmingming index",
+      "url": "https://raw.githubusercontent.com/fanmingming/live/main/tv/m3u/index.m3u"
+    },
+    {
+      "name": "fanmingming ipv4",
+      "url": "https://raw.githubusercontent.com/fanmingming/live/main/tv/m3u/ipv4.m3u"
+    },
+    {
+      "name": "iptv-org 中国",
+      "url": "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/cn.m3u"
+    }
+  ]
+}
