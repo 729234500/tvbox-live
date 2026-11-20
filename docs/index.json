@@ -1,6 +1,10 @@
 {
   "urls": [
     {
+      "url": "https://gh-proxy.com/https://raw.githubusercontent.com/729234500/tvbox-live/main/docs/merged.json",
+      "name": "合并大单仓（138站点）"
+    },
+    {
       "url": "https://gh-proxy.com/https://raw.githubusercontent.com/qist/tvbox/master/0821.json",
       "name": "饭太硬 0821（86站点）"
     },
@@ -10,7 +14,7 @@
     },
     {
       "url": "https://gh-proxy.com/https://raw.githubusercontent.com/qist/tvbox/master/jsm.json",
-      "name": "jsm 大合集（163站点）"
+      "name": "jsm 大合集（165站点）"
     },
     {
       "url": "https://gh-proxy.com/https://raw.githubusercontent.com/gaotianliuyun/gao/master/0827.json",

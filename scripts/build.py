@@ -84,6 +84,18 @@ def split_asset(s):
     return (s, "") if i < 0 else (s[:i], s[i:])
 
 
+def rel_join(base, path):
+    """相对路径拼接。不用 urljoin：镜像地址里本身含 'https://'，会被它折叠成 'https:/'。"""
+    if not path or path.startswith("http"):
+        return path
+    if path.startswith("//"):
+        return urllib.parse.urlsplit(base).scheme + ":" + path
+    if ".." in path:
+        return urllib.parse.urljoin(base, path)
+    d = base.rsplit("/", 1)[0]
+    return d + "/" + (path[2:] if path.startswith("./") else path)
+
+
 def http_get(url, timeout=TIMEOUT, max_bytes=MAX_BYTES, headers=None, retries=1):
     """返回 {status, body, url(最终地址), err, ms}。SSL 证书有问题时自动降级重试。"""
     url = ascii_url(url)
@@ -188,7 +200,7 @@ def check_asset(url, base):
     if not url:
         return True, ""
     path, _suffix = split_asset(url)
-    full = path if path.startswith("http") else urllib.parse.urljoin(base, path)
+    full = path if path.startswith("http") else rel_join(base, path)
     res = http_get(full, timeout=20, max_bytes=64 * 1024,
                    headers={"Range": "bytes=0-65535"}, retries=0)
     if res["status"] in (200, 206) and len(res["body"]) > 2000:
@@ -268,7 +280,7 @@ def analyze(src):
             return out
         spider = cfg.get("spider")
         if isinstance(spider, str) and spider:
-            out["spider"] = spider if spider.startswith("http") else urllib.parse.urljoin(
+            out["spider"] = spider if spider.startswith("http") else rel_join(
                 out["final_url"], spider)
             ok, note = check_asset(spider, out["final_url"])
             if not ok:
@@ -348,7 +360,13 @@ def discover():
 
 # ----------------------------------------------------------------------------- 直播
 def build_live():
-    lines, seen, src_stat = ["#EXTM3U"], set(), []
+    """抓直播源，同时产出：
+    - live.m3u  标准 m3u（每条流一行，兼容性好）
+    - live.txt  TVBox 原生格式，同一频道多线路用 # 连接，卡了能直接切线路
+    """
+    m3u_lines, seen_url, src_stat = ["#EXTM3U"], set(), []
+    chans, order = {}, []
+
     for item in CFG.get("live") or []:
         url = item["url"]
         res = http_get(mirrorize(url) if is_github(url) else url, timeout=30)
@@ -367,24 +385,169 @@ def build_live():
                 pending = ln
                 continue
             if ln.startswith("#"):
-                if not ln.upper().startswith(("#EXTM3U", "#EXT-X")):
-                    pending = pending  # 其它标签忽略
                 continue
             if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.\-]*://", ln):
                 continue
-            if ln in seen:
+            if ln in seen_url:
                 pending = None
                 continue
-            seen.add(ln)
-            if pending:
-                lines.append(pending)
-            lines.append(ln)
+            seen_url.add(ln)
             cnt += 1
+
+            meta = pending or ""
+            name = meta.rsplit(",", 1)[-1].strip() if "," in meta else "未命名"
+            g = re.search(r'group-title="([^"]*)"', meta)
+            group = (g.group(1).strip() if g else "") or "其它"
+
+            m3u_lines.append(meta)
+            m3u_lines.append(ln)
+
+            # 频道归并键：去掉括号备注、清晰度后缀、空格，CCTV-1 与 CCTV1 视为同一台。
+            # 只做确定性归一，不做模糊匹配，避免把 CCTV-1 和 CCTV-10 混成一个。
+            norm = re.sub(r"\s+", "", name)
+            norm = re.sub(r"[（(][^）)]*[）)]", "", norm)
+            norm = re.sub(r"(?i)(高清|超清|标清|蓝光|FHD|UHD|HD|4K|8K|1080P|720P)$", "", norm)
+            norm = re.sub(r"(?i)^(CCTV|CGTN)-?(\d+)$", lambda m: m.group(1).upper() + m.group(2), norm)
+            key = norm.lower() or name
+
+            if key not in chans:
+                chans[key] = {"name": name, "group": group, "urls": []}
+                order.append(key)
+            if len(chans[key]["urls"]) < 6:
+                chans[key]["urls"].append(ln)
             pending = None
         src_stat.append((item["name"], cnt, "ok" if cnt else "无有效频道"))
 
-    (DOCS / "live.m3u").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return src_stat, len(seen)
+    (DOCS / "live.m3u").write_text("\n".join(m3u_lines) + "\n", encoding="utf-8")
+
+    txt, cur = [], None
+    for key in order:
+        c = chans[key]
+        if c["group"] != cur:
+            txt.append("%s,#genre#," % c["group"])
+            cur = c["group"]
+        txt.append("%s,%s" % (c["name"], "#".join(c["urls"])))
+    (DOCS / "live.txt").write_text("\n".join(txt) + "\n", encoding="utf-8")
+
+    multi = sum(1 for k in order if len(chans[k]["urls"]) > 1)
+    return src_stat, len(seen_url), len(order), multi
+
+
+# ----------------------------------------------------------------------------- 合并单仓
+def build_merged(alive):
+    """把「共用同一个 spider jar」的多个源合并成一个大单仓。
+
+    同一个 jar 才能安全合并（站点直接拼接，不依赖 site 级 jar）。
+    换源池因此变大：一部片能在合并后的所有站点之间切换。
+    """
+    groups = {}
+    for r in alive:
+        if r["kind"] != "single" or not r["cfg"] or not r["spider"]:
+            continue
+        groups.setdefault(r["spider"], []).append(r)
+
+    def uniq_sites(members):
+        """按 api 去重后真正能用的站点数——多份配置常常大面积重叠，只看总和会高估。"""
+        seen = set()
+        for m in members:
+            for s in (m["cfg"].get("sites") or []):
+                if isinstance(s, dict):
+                    seen.add(s.get("api") or s.get("key"))
+        return len(seen)
+
+    best = None
+    for sp, members in groups.items():
+        if len(members) < 2:
+            continue
+        u = uniq_sites(members)
+        if u < 100:
+            continue
+        score = (u, max(m["prefer"] for m in members))
+        if best is None or score > best[0]:
+            best = (score, members)
+    if not best:
+        return None
+
+    members = best[1]
+    members.sort(key=lambda r: -r["prefer"])
+    base = members[0]
+    cfg = json.loads(json.dumps(base["cfg"], ensure_ascii=False))
+
+    # 统一重建：所有成员的站点都走同一套去重（含基础配置自身的重复项）
+    sites, used_keys, used_api = [], set(), set()
+    merged_from = [base["name"]]
+    for idx, m in enumerate(members):
+        before = len(sites)
+        for s in (m["cfg"].get("sites") or []):
+            if not isinstance(s, dict):
+                continue
+            api = s.get("api") or ""
+            dedup = api or ("key::%s" % s.get("key"))
+            if dedup in used_api:
+                continue
+            used_api.add(dedup)
+            ns = dict(s)
+            k = ns.get("key") or "site"
+            if k in used_keys:
+                i = 2
+                while "%s-%d" % (k, i) in used_keys:
+                    i += 1
+                ns["key"] = "%s-%d" % (k, i)
+            used_keys.add(ns["key"])
+            sites.append(ns)
+        if idx and len(sites) > before:
+            merged_from.append(m["name"])
+
+    if len(sites) <= len(base["cfg"].get("sites") or []):
+        return None
+
+    parses = [dict(p) for p in (cfg.get("parses") or []) if isinstance(p, dict)]
+    p_seen = {(p.get("name"), p.get("url")) for p in parses}
+    for m in members[1:]:
+        for p in (m["cfg"].get("parses") or []):
+            if not isinstance(p, dict):
+                continue
+            sig = (p.get("name"), p.get("url"))
+            if sig in p_seen:
+                continue
+            p_seen.add(sig)
+            parses.append(dict(p))
+
+    # 基础配置没有解析池时，从别的存活源借一份（解析 js 与 spider jar 无关，可安全借用）
+    if not parses:
+        donor = next((r for r in sorted(alive, key=lambda x: -x["prefer"])
+                      if r["kind"] == "single" and (r["cfg"].get("parses"))), None)
+        if donor:
+            for p in donor["cfg"]["parses"]:
+                if not isinstance(p, dict):
+                    continue
+                q = dict(p)
+                if isinstance(q.get("url"), str):
+                    path, suf = split_asset(q["url"])
+                    q["url"] = (mirrorize(path) if path.startswith("http")
+                                else mirrorize(rel_join(donor["final_url"], path))) + suf
+                parses.append(q)
+            print("  解析池借用：%s（%d 个）" % (donor["name"], len(parses)))
+
+    lives = [dict(l) for l in (cfg.get("lives") or []) if isinstance(l, dict)]
+    live_urls = {l.get("url") for l in lives}
+    for m in members[1:]:
+        for l in (m["cfg"].get("lives") or []):
+            if not isinstance(l, dict) or l.get("url") in live_urls:
+                continue
+            lives.append(dict(l))
+            live_urls.add(l.get("url"))
+
+    cfg["sites"] = sites
+    if parses:
+        cfg["parses"] = parses
+    if lives:
+        cfg["lives"] = lives
+    cfg = absolutize(cfg, base["final_url"])
+    cfg["name"] = "合并大单仓 · %d 站点" % len(sites)
+    (DOCS / "merged.json").write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    print("  merged.json：%d 站点（%s）" % (len(sites), " + ".join(merged_from)))
+    return {"sites": len(sites), "from": merged_from}
 
 
 # ----------------------------------------------------------------------------- best.json
@@ -394,7 +557,7 @@ def absolutize(cfg, base):
         if not isinstance(u, str) or not u or u.startswith("data:"):
             return u
         path, suffix = split_asset(u)
-        full = path if path.startswith("http") else urllib.parse.urljoin(base, path)
+        full = path if path.startswith("http") else rel_join(base, path)
         return mirrorize(full) + suffix
 
     if isinstance(cfg.get("spider"), str):
@@ -469,10 +632,21 @@ def main():
                              else "（%d仓）" % r["sites"])
         return {"url": mirrorize(r["url"], which), "name": label}
 
-    index = {"urls": [entry(r, 1) for r in picked]}
-    index_alt = {"urls": [entry(r, 2) for r in picked]}
-    allcfg = {"urls": [entry(r, 1) for r in alive]}
-    raw_index = {"urls": [{"url": r["url"], "name": entry(r)["name"]} for r in picked]}
+    repo = os.environ.get("GITHUB_REPOSITORY") or "OWNER/REPO"
+    self_raw = "https://raw.githubusercontent.com/%s/main/docs/merged.json" % repo
+    merged = build_merged(alive)
+    m_name = "合并大单仓（%d站点）" % merged["sites"] if merged else ""
+
+    def m_entry(which=1):
+        return {"url": mirrorize(self_raw, which), "name": m_name}
+
+    head1 = [m_entry(1)] if merged else []
+    head2 = [m_entry(2)] if merged else []
+    index = {"urls": head1 + [entry(r, 1) for r in picked]}
+    index_alt = {"urls": head2 + [entry(r, 2) for r in picked]}
+    allcfg = {"urls": head1 + [entry(r, 1) for r in alive]}
+    raw_index = {"urls": ([{"url": self_raw, "name": m_name}] if merged else []) +
+                          [{"url": r["url"], "name": entry(r)["name"]} for r in picked]}
 
     (DOCS / "index.json").write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
     (DOCS / "index-alt.json").write_text(json.dumps(index_alt, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -488,7 +662,7 @@ def main():
         print("  best.json 取自：%s" % best["name"])
 
     print("[3/4] 生成直播源 ...")
-    live_stat, live_cnt = build_live()
+    live_stat, live_cnt, live_ch, live_multi = build_live()
 
     print("[4/4] 写体检报告 ...")
     health = {
@@ -496,7 +670,10 @@ def main():
         "checked": len(results),
         "alive": len(alive),
         "picked": len(picked),
-        "live_channels": live_cnt,
+        "merged": merged or {},
+        "live_streams": live_cnt,
+        "live_channels": live_ch,
+        "live_multi_line": live_multi,
         "sources": [{k: r[k] for k in ("name", "url", "kind", "sites", "parses", "lives",
                                        "alive", "reason", "note", "ms", "discovered")}
                     for r in results],
@@ -526,13 +703,20 @@ def main():
             r["sites"], r["parses"], r["lives"], r["ms"],
             (r["note"] or r["reason"] or "—").replace("|", "/")))
     md += ["", "## 直播源", "",
-           "| 状态 | 名称 | 频道数 | 备注 |", "|---|---|---|---|"]
+           "| 状态 | 名称 | 流数 | 备注 |", "|---|---|---|---|"]
     for name, cnt, note in live_stat:
         md.append("| %s | %s | %d | %s |" % ("🟢" if cnt else "🔴", name, cnt, note))
+    md += ["", "合并后共 **%d** 个频道 / %d 条流，其中 **%d** 个频道有备用线路（live.txt 里用 # 连接）。"
+           % (live_ch, live_cnt, live_multi)]
+    if merged:
+        md += ["", "## 合并单仓", "",
+               "**%d 站点**，来自 %s（共用同一个 spider jar，合并安全）。"
+               % (merged["sites"], " + ".join(merged["from"]))]
     md += ["", "由 GitHub Actions 每日自动生成，请勿手改。"]
     (DOCS / "status.md").write_text("\n".join(md) + "\n", encoding="utf-8")
 
-    print("完成：收录 %d 个源，直播 %d 个频道" % (len(picked), live_cnt))
+    print("完成：收录 %d 个源，合并仓 %d 站点，直播 %d 频道 / %d 条流"
+          % (len(picked), merged["sites"] if merged else 0, live_ch, live_cnt))
     return 0
 
 
