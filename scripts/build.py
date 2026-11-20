@@ -516,7 +516,7 @@ def main():
                     % (os.environ.get("GITHUB_REPOSITORY", "OWNER/REPO").split("/")[0],
                        os.environ.get("GITHUB_REPOSITORY", "OWNER/REPO").split("/")[-1])),
           "```", "",
-          "备用镜像：见 README 的「三、固定链接」一节。", "",
+          "备用镜像：见 README 的「一、电视端填这一个就够了」一节。", "",
           "## 各源状态", "",
           "| 状态 | 名称 | 类型 | 站点 | 解析 | 直播 | 耗时 | 说明 |",
           "|---|---|---|---|---|---|---|---|"]
