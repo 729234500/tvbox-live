@@ -54,4 +54,15 @@ jobs:
             exit 0
           fi
           git commit -m "chore: 自动更新可用源 $(date -u '+%Y-%m-%d %H:%M UTC')"
-          git push
+          # 构建要跑十几分钟，期间可能有人手动推了 commit，直接 push 会因
+          # non-fast-forward 被拒。先 rebase 再推，最多重试 3 次。
+          for i in 1 2 3; do
+            if git pull --rebase --autostash origin main && git push; then
+              echo "推送成功（第 $i 次尝试）"
+              exit 0
+            fi
+            echo "推送失败，第 $i 次，5 秒后重试…"
+            sleep 5
+          done
+          echo "!! 连续 3 次推送失败，产物留在本次运行里，请手动 Run workflow 重跑"
+          exit 1
