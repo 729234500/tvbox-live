@@ -10,6 +10,7 @@ on:
     paths:                      # 改了源清单/脚本就顺手重跑
       - "sources.json"
       - "scripts/build.py"
+      - "scripts/merge_iptv.py"
       - ".github/workflows/update.yml"
 
 permissions:
@@ -34,6 +35,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/build.py
+
+      # 把 iptv-api 每天生成的最新直播结果并进来。
+      # continue-on-error：这一步挂掉不影响上面 build.py 的产物照常提交。
+      - name: 合并 iptv-api 每日直播源
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/merge_iptv.py
 
       - name: 提交产物
         run: |
