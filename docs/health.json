@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-24T12:23:36.011829+08:00",
+  "updated": "2026-11-25T11:08:03.514440+08:00",
   "checked": 15,
   "alive": 12,
   "picked": 9,
@@ -10,8 +10,8 @@
       "tvbox/9918.json"
     ]
   },
-  "live_streams": 615,
-  "live_channels": 407,
+  "live_streams": 616,
+  "live_channels": 408,
   "live_multi_line": 84,
   "sources": [
     {
@@ -24,7 +24,7 @@
       "alive": true,
       "reason": "",
       "note": "",
-      "ms": 161,
+      "ms": 97,
       "discovered": false
     },
     {
@@ -37,7 +37,7 @@
       "alive": true,
       "reason": "",
       "note": "",
-      "ms": 98,
+      "ms": 126,
       "discovered": false
     },
     {
@@ -50,7 +50,7 @@
       "alive": true,
       "reason": "",
       "note": "",
-      "ms": 191,
+      "ms": 120,
       "discovered": false
     },
     {
@@ -63,7 +63,7 @@
       "alive": true,
       "reason": "",
       "note": "",
-      "ms": 293,
+      "ms": 154,
       "discovered": false
     },
     {
@@ -76,7 +76,7 @@
       "alive": true,
       "reason": "",
       "note": "",
-      "ms": 282,
+      "ms": 151,
       "discovered": false
     },
     {
@@ -89,7 +89,7 @@
       "alive": true,
       "reason": "",
       "note": "抽查 1/3 子仓可用",
-      "ms": 166,
+      "ms": 144,
       "discovered": false
     },
     {
@@ -102,7 +102,7 @@
       "alive": true,
       "reason": "",
       "note": "",
-      "ms": 965,
+      "ms": 561,
       "discovered": false
     },
     {
@@ -115,7 +115,7 @@
       "alive": false,
       "reason": "返回的是 HTML（不是配置）",
       "note": "",
-      "ms": 1173,
+      "ms": 1086,
       "discovered": false
     },
     {
@@ -128,7 +128,7 @@
       "alive": true,
       "reason": "",
       "note": "抽查 1/3 子仓可用",
-      "ms": 1691,
+      "ms": 1155,
       "discovered": false
     },
     {
@@ -141,7 +141,7 @@
       "alive": false,
       "reason": "多仓里没有有效子地址",
       "note": "",
-      "ms": 303,
+      "ms": 104,
       "discovered": true
     },
     {
@@ -154,7 +154,7 @@
       "alive": true,
       "reason": "",
       "note": "",
-      "ms": 153,
+      "ms": 107,
       "discovered": true
     },
     {
@@ -167,7 +167,7 @@
       "alive": true,
       "reason": "",
       "note": "",
-      "ms": 277,
+      "ms": 120,
       "discovered": true
     },
     {
@@ -180,7 +180,7 @@
       "alive": false,
       "reason": "依赖下载失败（HTTP 404）",
       "note": "",
-      "ms": 100,
+      "ms": 84,
       "discovered": true
     },
     {
@@ -193,7 +193,7 @@
       "alive": true,
       "reason": "",
       "note": "",
-      "ms": 113,
+      "ms": 106,
       "discovered": true
     },
     {
@@ -206,7 +206,7 @@
       "alive": true,
       "reason": "",
       "note": "",
-      "ms": 124,
+      "ms": 143,
       "discovered": true
     }
   ]
